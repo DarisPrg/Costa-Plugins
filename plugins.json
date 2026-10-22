@@ -1,0 +1,82 @@
+[
+    {
+        "iconUrl": "https://www.google.com/s2/favicons?domain=themoviedb.org&sz=%size%",
+        "fileHash": "sha256-e6aeddf5161f9daba638802e4e09e950fc6fe572e5a3d1b927885430db85e64d",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/DarisPrg/Costa-Plugins",
+        "fileSize": 33249,
+        "status": 1,
+        "language": "es-AR",
+        "authors": [
+            "DarisPrg"
+        ],
+        "tvTypes": [
+            "Movie"
+        ],
+        "version": 6,
+        "internalName": "Clasicos80",
+        "description": "Cl\u00e1sicos de los 80 en espa\u00f1ol latino. Busca en tus proveedores instalados.",
+        "url": "https://raw.githubusercontent.com/DarisPrg/Costa-Plugins/builds/Clasicos80.cs3",
+        "name": "Clasicos80"
+    },
+    {
+        "iconUrl": "https://www.google.com/s2/favicons?domain=themoviedb.org&sz=%size%",
+        "fileHash": "sha256-905a7adf2f5d154e97a727c5eeb5db756f5cabde54ea69ca8a89c7b55a847fa6",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/DarisPrg/Costa-Plugins",
+        "fileSize": 33345,
+        "status": 1,
+        "language": "es-AR",
+        "authors": [
+            "DarisPrg"
+        ],
+        "tvTypes": [
+            "Movie"
+        ],
+        "version": 5,
+        "internalName": "Clasicos90",
+        "description": "Cl\u00e1sicos de los 90 en espa\u00f1ol latino. Busca en tus proveedores instalados.",
+        "url": "https://raw.githubusercontent.com/DarisPrg/Costa-Plugins/builds/Clasicos90.cs3",
+        "name": "Clasicos90"
+    },
+    {
+        "iconUrl": "https://www.google.com/s2/favicons?domain=iptv-org.github.io&sz=%size%",
+        "fileHash": "sha256-9c85fc38bf967aee3c7fe9df035f25d96365a2baae60b49929e63f409b5b3e16",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/DarisPrg/Costa-Plugins",
+        "fileSize": 17653,
+        "status": 3,
+        "language": "es-AR",
+        "authors": [
+            "DarisPrg"
+        ],
+        "tvTypes": [
+            "Live"
+        ],
+        "version": 1,
+        "internalName": "CostaVivo",
+        "description": "Canales en vivo y 24/7 gratuitos en espa\u00f1ol: series, dibujos, pel\u00edculas, noticias y canales argentinos.",
+        "url": "https://raw.githubusercontent.com/DarisPrg/Costa-Plugins/builds/CostaVivo.cs3",
+        "name": "CostaVivo"
+    },
+    {
+        "iconUrl": "https://www.google.com/s2/favicons?domain=themoviedb.org&sz=%size%",
+        "fileHash": "sha256-aae7a0fd2aac31fa06e0f284e1e7926182abde21905232c31365fbd8e7ad81e9",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/DarisPrg/Costa-Plugins",
+        "fileSize": 33730,
+        "status": 1,
+        "language": "es-AR",
+        "authors": [
+            "DarisPrg"
+        ],
+        "tvTypes": [
+            "Movie"
+        ],
+        "version": 5,
+        "internalName": "ModoVacaciones",
+        "description": "Todo el cine en un solo lugar: estrenos, g\u00e9neros, infantiles y cl\u00e1sicos. Busca en tus proveedores instalados.",
+        "url": "https://raw.githubusercontent.com/DarisPrg/Costa-Plugins/builds/ModoVacaciones.cs3",
+        "name": "ModoVacaciones"
+    }
+]
