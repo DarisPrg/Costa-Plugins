@@ -17,7 +17,7 @@ import kotlin.math.abs
 class Clasicos80Provider : MainAPI() {
     override var mainUrl = "https://api.themoviedb.org"
     override var name = "Clásicos de los 80"
-    override var lang = "es"
+    override var lang = "es-AR"
     override val hasMainPage = true
     override val supportedTypes = setOf(TvType.Movie)
 
