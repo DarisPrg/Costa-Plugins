@@ -1,5 +1,5 @@
 // Versión del plugin: subila (2, 3, 4...) cada vez que cambies algo
-version = 2
+version = 3
 
 cloudstream {
     description = "Clásicos de los 80 en español latino. Busca en tus proveedores instalados."
@@ -9,4 +9,3 @@ cloudstream {
     language = "es-AR"
     iconUrl = "https://www.google.com/s2/favicons?domain=themoviedb.org&sz=%size%"
 }
-// Costa Stream 📼

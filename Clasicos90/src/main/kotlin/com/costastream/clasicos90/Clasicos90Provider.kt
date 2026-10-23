@@ -39,7 +39,11 @@ class Clasicos90Provider : MainAPI() {
         private val IDIOMAS = setOf("es", "mx", "es-mx", "es-419", "es-ar")
 
         // Tiempo máximo de espera por proveedor (milisegundos)
-        private const val TIMEOUT_MS = 25_000L
+        private const val TIMEOUT_MS = 30_000L
+
+        // Títulos alternativos: países preferidos (en orden) y cantidad máxima de títulos a probar
+        private val PAISES = listOf("MX", "AR", "CO", "CL", "PE", "VE", "UY", "ES", "US")
+        private const val MAX_TITULOS = 5
     }
 
     // Secciones del Home: "ruta|parámetros" to "Título"
@@ -109,8 +113,8 @@ class Clasicos90Provider : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         val datos = parseJson<Datos>(data)
-        val titulos = listOfNotNull(datos.titulo, datos.original).distinct()
-        val buscados = titulos.map { normalizar(it) }.toSet()
+        val titulos = titulosAlternativos(datos)
+        val buscados = titulos.map { normalizar(it) }.filter { it.isNotEmpty() }.toSet()
 
         val proveedores = APIHolder.apis.toList().filter { api ->
             api.name != name &&
@@ -147,9 +151,9 @@ class Clasicos90Provider : MainAPI() {
     ): Boolean {
         for (t in titulos) {
             val res = api.search(t) ?: continue
+            // Cada resultado se compara contra TODOS los títulos conocidos, no solo el buscado
             val match = res.firstOrNull { r ->
-                val y = (r as? MovieSearchResponse)?.year
-                normalizar(r.name) in buscados && (y == null || anio == null || abs(y - anio) <= 1)
+                coincide(r.name, (r as? MovieSearchResponse)?.year, buscados, anio)
             } ?: continue
             val lr = api.load(match.url) as? MovieLoadResponse ?: continue
             return api.loadLinks(lr.dataUrl, isCasting, subtitleCallback, callback)
@@ -157,11 +161,57 @@ class Clasicos90Provider : MainAPI() {
         return false
     }
 
-    private fun normalizar(s: String): String =
-        Normalizer.normalize(s, Normalizer.Form.NFD)
+    // Junta el título en español, el original y los títulos alternativos de TMDB
+    // (traducciones al español y nombres por país: México, Argentina, España, etc.)
+    private suspend fun titulosAlternativos(datos: Datos): List<String> {
+        val lista = mutableListOf(datos.titulo)
+        datos.original?.let { lista.add(it) }
+        try {
+            val alt = app.get("$API/movie/${datos.id}?api_key=$TMDB_API_KEY&append_to_response=alternative_titles,translations")
+                .parsedSafe<TmdbAlternativos>()
+            alt?.translations?.translations
+                ?.filter { it.lang == "es" }
+                ?.sortedBy { tr -> PAISES.indexOf(tr.pais).let { i -> if (i < 0) 99 else i } }
+                ?.mapNotNull { tr -> tr.data?.title?.takeIf { s -> s.isNotBlank() } }
+                ?.let { lista.addAll(it) }
+            alt?.alternativeTitles?.titles
+                ?.filter { it.pais in PAISES }
+                ?.sortedBy { PAISES.indexOf(it.pais) }
+                ?.mapNotNull { at -> at.title?.takeIf { s -> s.isNotBlank() } }
+                ?.let { lista.addAll(it) }
+        } catch (e: Throwable) {
+            // Si TMDB no responde, seguimos con los dos títulos básicos
+        }
+        val vistos = mutableSetOf<String>()
+        return lista.filter { normalizar(it).let { n -> n.isNotEmpty() && vistos.add(n) } }.take(MAX_TITULOS)
+    }
+
+    private fun coincide(nombre: String, y: Int?, buscados: Set<String>, anio: Int?): Boolean {
+        val n = normalizar(nombre)
+        if (n.isEmpty()) return false
+        val anioOk = y == null || anio == null || abs(y - anio) <= 1
+        if (n in buscados && anioOk) return true
+        // Coincidencia parcial ("Volver al futuro" / "Volver al futuro parte I") solo con el año exacto,
+        // para no confundir remakes o secuelas
+        if (y != null && anio != null && y == anio) {
+            return buscados.any { b ->
+                b.length >= 6 && n.length >= 6 && (n.startsWith(b) || b.startsWith(n))
+            }
+        }
+        return false
+    }
+
+    private fun normalizar(s: String): String {
+        var t = Normalizer.normalize(s, Normalizer.Form.NFD)
             .replace(Regex("\\p{M}+"), "")
             .lowercase()
-            .replace(Regex("[^a-z0-9]"), "")
+        t = t.replace(Regex("\\((19|20)\\d{2}\\)"), " ")   // "(1985)"
+            .replace(Regex("\\[[^\\]]*\\]"), " ")          // "[Latino]"
+            .replace(Regex("\\b(latino|castellano|espanol|subtitulada|subtitulado|hd|4k|1080p|720p)\\b"), " ")
+            .trim()
+        t = t.replace(Regex("^(el|la|los|las|the|un|una)\\s+"), "")
+        return t.replace(Regex("[^a-z0-9]"), "")
+    }
 
     private fun TmdbMovie.toSearch(): SearchResponse? {
         val titulo = title ?: originalTitle ?: return null
@@ -205,6 +255,26 @@ class Clasicos90Provider : MainAPI() {
         @JsonProperty("genres") val genres: List<Genero>? = null,
         @JsonProperty("credits") val credits: Creditos? = null,
     )
+
+    data class TmdbAlternativos(
+        @JsonProperty("alternative_titles") val alternativeTitles: AltTitulos? = null,
+        @JsonProperty("translations") val translations: Traducciones? = null,
+    )
+
+    data class AltTitulos(@JsonProperty("titles") val titles: List<AltTitulo>? = null)
+    data class AltTitulo(
+        @JsonProperty("iso_3166_1") val pais: String? = null,
+        @JsonProperty("title") val title: String? = null,
+    )
+
+    data class Traducciones(@JsonProperty("translations") val translations: List<Traduccion>? = null)
+    data class Traduccion(
+        @JsonProperty("iso_3166_1") val pais: String? = null,
+        @JsonProperty("iso_639_1") val lang: String? = null,
+        @JsonProperty("data") val data: TradData? = null,
+    )
+
+    data class TradData(@JsonProperty("title") val title: String? = null)
 
     data class Genero(@JsonProperty("name") val name: String? = null)
     data class Creditos(@JsonProperty("cast") val cast: List<Actor>? = null)

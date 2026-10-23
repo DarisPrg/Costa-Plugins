@@ -22,39 +22,53 @@ class Clasicos80Provider : MainAPI() {
     override val supportedTypes = setOf(TvType.Movie)
 
     companion object {
-        // ⚠️ Pegá acá tu API Key de TMDB (la "API Key", no el token largo)
+        // API Key de TMDB
         private const val TMDB_API_KEY = "89a0e5fdc4112639091671c042604699"
 
         private const val API = "https://api.themoviedb.org/3"
         private const val IMG = "https://image.tmdb.org/t/p"
-        private const val DESDE = "1980-01-01"
-        private const val HASTA = "1989-12-31"
+
+        // Rango de años (0 = sin límite). Se usa para filtrar la búsqueda.
+        private const val ANIO_DESDE = 1980
+        private const val ANIO_HASTA = 1989
+
+        // Filtro que se agrega a todas las secciones "discover" (vacío = ninguno)
+        private const val FILTRO_BASE = "primary_release_date.gte=1980-01-01&primary_release_date.lte=1989-12-31"
 
         // Idiomas de los proveedores donde se busca (español / latino)
-        private val IDIOMAS = setOf("es", "mx", "es-mx", "es-419")
+        private val IDIOMAS = setOf("es", "mx", "es-mx", "es-419", "es-ar")
 
         // Tiempo máximo de espera por proveedor (milisegundos)
-        private const val TIMEOUT_MS = 25_000L
+        private const val TIMEOUT_MS = 30_000L
+
+        // Títulos alternativos: países preferidos (en orden) y cantidad máxima de títulos a probar
+        private val PAISES = listOf("MX", "AR", "CO", "CL", "PE", "VE", "UY", "ES", "US")
+        private const val MAX_TITULOS = 5
     }
 
-    // Secciones del Home. Géneros TMDB: 28 acción, 12 aventura, 16 animación,
-    // 35 comedia, 27 terror, 878 ciencia ficción, 10751 familia
+    // Secciones del Home: "ruta|parámetros" to "Título"
+    // Géneros TMDB: 12 aventura, 14 fantasía, 16 animación, 18 drama, 27 terror, 28 acción,
+    // 35 comedia, 53 suspenso, 80 policial, 99 documental, 878 ciencia ficción,
+    // 10402 música, 10749 romance, 10751 familia
     override val mainPage = mainPageOf(
-        "sort_by=popularity.desc" to "🎬 Los más populares de los 80",
-        "sort_by=popularity.desc&with_genres=35" to "😂 Comedias ochentosas",
-        "sort_by=popularity.desc&with_genres=28" to "💥 Acción de los 80",
-        "sort_by=popularity.desc&with_genres=878" to "👽 Ciencia ficción de los 80",
-        "sort_by=popularity.desc&with_genres=12" to "🗺️ Aventuras de los 80",
-        "sort_by=popularity.desc&with_genres=27" to "👻 Terror de los 80",
-        "sort_by=popularity.desc&with_genres=16" to "📺 Animación de los 80",
-        "sort_by=popularity.desc&with_genres=10751" to "👨‍👩‍👧 Para ver en familia",
-        "sort_by=vote_average.desc&vote_count.gte=2000" to "🏆 Los mejor puntuados",
+        "discover/movie|sort_by=popularity.desc" to "🎬 Los más populares de los 80",
+        "discover/movie|sort_by=popularity.desc&with_genres=35" to "😂 Comedias ochentosas",
+        "discover/movie|sort_by=popularity.desc&with_genres=28" to "💥 Acción de los 80",
+        "discover/movie|sort_by=popularity.desc&with_genres=878" to "👽 Ciencia ficción de los 80",
+        "discover/movie|sort_by=popularity.desc&with_genres=12" to "🗺️ Aventuras de los 80",
+        "discover/movie|sort_by=popularity.desc&with_genres=27" to "👻 Terror de los 80",
+        "discover/movie|sort_by=popularity.desc&with_genres=16" to "📺 Animación de los 80",
+        "discover/movie|sort_by=popularity.desc&with_genres=10751" to "👨‍👩‍👧 Para ver en familia",
+        "discover/movie|sort_by=vote_average.desc&vote_count.gte=2000" to "🏆 Los mejor puntuados"
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val url = "$API/discover/movie?api_key=$TMDB_API_KEY&language=es-MX&include_adult=false" +
-                "&primary_release_date.gte=$DESDE&primary_release_date.lte=$HASTA" +
-                "&${request.data}&page=$page"
+        val partes = request.data.split("|", limit = 2)
+        val ruta = partes[0]
+        val params = partes.getOrElse(1) { "" }
+        val filtro = if (ruta.startsWith("discover") && FILTRO_BASE.isNotEmpty()) "&$FILTRO_BASE" else ""
+        val url = "$API/$ruta?api_key=$TMDB_API_KEY&language=es-MX&include_adult=false" +
+                "$filtro&$params&page=$page"
         val res = app.get(url).parsedSafe<TmdbPage>()
         val items = res?.results.orEmpty().mapNotNull { it.toSearch() }
         val hasNext = (res?.page ?: 0) < (res?.totalPages ?: 0)
@@ -66,7 +80,10 @@ class Clasicos80Provider : MainAPI() {
         val res = app.get("$API/search/movie?api_key=$TMDB_API_KEY&language=es-MX&include_adult=false&query=$q")
             .parsedSafe<TmdbPage>()
         return res?.results.orEmpty()
-            .filter { (it.anio() ?: 0) in 1980..1989 }
+            .filter { m ->
+                val y = m.anio() ?: 0
+                (ANIO_DESDE == 0 || y >= ANIO_DESDE) && (ANIO_HASTA == 0 || y <= ANIO_HASTA)
+            }
             .mapNotNull { it.toSearch() }
     }
 
@@ -94,12 +111,13 @@ class Clasicos80Provider : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         val datos = parseJson<Datos>(data)
-        val titulos = listOfNotNull(datos.titulo, datos.original).distinct()
-        val buscados = titulos.map { normalizar(it) }.toSet()
+        val titulos = titulosAlternativos(datos)
+        val buscados = titulos.map { normalizar(it) }.filter { it.isNotEmpty() }.toSet()
 
         val proveedores = APIHolder.apis.toList().filter { api ->
             api.name != name &&
                     !api.name.contains("Catalogo", ignoreCase = true) &&
+                    api.mainUrl != mainUrl &&
                     api.lang.lowercase() in IDIOMAS &&
                     api.supportedTypes.contains(TvType.Movie)
         }
@@ -131,9 +149,9 @@ class Clasicos80Provider : MainAPI() {
     ): Boolean {
         for (t in titulos) {
             val res = api.search(t) ?: continue
+            // Cada resultado se compara contra TODOS los títulos conocidos, no solo el buscado
             val match = res.firstOrNull { r ->
-                val y = (r as? MovieSearchResponse)?.year
-                normalizar(r.name) in buscados && (y == null || anio == null || abs(y - anio) <= 1)
+                coincide(r.name, (r as? MovieSearchResponse)?.year, buscados, anio)
             } ?: continue
             val lr = api.load(match.url) as? MovieLoadResponse ?: continue
             return api.loadLinks(lr.dataUrl, isCasting, subtitleCallback, callback)
@@ -141,11 +159,57 @@ class Clasicos80Provider : MainAPI() {
         return false
     }
 
-    private fun normalizar(s: String): String =
-        Normalizer.normalize(s, Normalizer.Form.NFD)
+    // Junta el título en español, el original y los títulos alternativos de TMDB
+    // (traducciones al español y nombres por país: México, Argentina, España, etc.)
+    private suspend fun titulosAlternativos(datos: Datos): List<String> {
+        val lista = mutableListOf(datos.titulo)
+        datos.original?.let { lista.add(it) }
+        try {
+            val alt = app.get("$API/movie/${datos.id}?api_key=$TMDB_API_KEY&append_to_response=alternative_titles,translations")
+                .parsedSafe<TmdbAlternativos>()
+            alt?.translations?.translations
+                ?.filter { it.lang == "es" }
+                ?.sortedBy { tr -> PAISES.indexOf(tr.pais).let { i -> if (i < 0) 99 else i } }
+                ?.mapNotNull { tr -> tr.data?.title?.takeIf { s -> s.isNotBlank() } }
+                ?.let { lista.addAll(it) }
+            alt?.alternativeTitles?.titles
+                ?.filter { it.pais in PAISES }
+                ?.sortedBy { PAISES.indexOf(it.pais) }
+                ?.mapNotNull { at -> at.title?.takeIf { s -> s.isNotBlank() } }
+                ?.let { lista.addAll(it) }
+        } catch (e: Throwable) {
+            // Si TMDB no responde, seguimos con los dos títulos básicos
+        }
+        val vistos = mutableSetOf<String>()
+        return lista.filter { normalizar(it).let { n -> n.isNotEmpty() && vistos.add(n) } }.take(MAX_TITULOS)
+    }
+
+    private fun coincide(nombre: String, y: Int?, buscados: Set<String>, anio: Int?): Boolean {
+        val n = normalizar(nombre)
+        if (n.isEmpty()) return false
+        val anioOk = y == null || anio == null || abs(y - anio) <= 1
+        if (n in buscados && anioOk) return true
+        // Coincidencia parcial ("Volver al futuro" / "Volver al futuro parte I") solo con el año exacto,
+        // para no confundir remakes o secuelas
+        if (y != null && anio != null && y == anio) {
+            return buscados.any { b ->
+                b.length >= 6 && n.length >= 6 && (n.startsWith(b) || b.startsWith(n))
+            }
+        }
+        return false
+    }
+
+    private fun normalizar(s: String): String {
+        var t = Normalizer.normalize(s, Normalizer.Form.NFD)
             .replace(Regex("\\p{M}+"), "")
             .lowercase()
-            .replace(Regex("[^a-z0-9]"), "")
+        t = t.replace(Regex("\\((19|20)\\d{2}\\)"), " ")   // "(1985)"
+            .replace(Regex("\\[[^\\]]*\\]"), " ")          // "[Latino]"
+            .replace(Regex("\\b(latino|castellano|espanol|subtitulada|subtitulado|hd|4k|1080p|720p)\\b"), " ")
+            .trim()
+        t = t.replace(Regex("^(el|la|los|las|the|un|una)\\s+"), "")
+        return t.replace(Regex("[^a-z0-9]"), "")
+    }
 
     private fun TmdbMovie.toSearch(): SearchResponse? {
         val titulo = title ?: originalTitle ?: return null
@@ -189,6 +253,26 @@ class Clasicos80Provider : MainAPI() {
         @JsonProperty("genres") val genres: List<Genero>? = null,
         @JsonProperty("credits") val credits: Creditos? = null,
     )
+
+    data class TmdbAlternativos(
+        @JsonProperty("alternative_titles") val alternativeTitles: AltTitulos? = null,
+        @JsonProperty("translations") val translations: Traducciones? = null,
+    )
+
+    data class AltTitulos(@JsonProperty("titles") val titles: List<AltTitulo>? = null)
+    data class AltTitulo(
+        @JsonProperty("iso_3166_1") val pais: String? = null,
+        @JsonProperty("title") val title: String? = null,
+    )
+
+    data class Traducciones(@JsonProperty("translations") val translations: List<Traduccion>? = null)
+    data class Traduccion(
+        @JsonProperty("iso_3166_1") val pais: String? = null,
+        @JsonProperty("iso_639_1") val lang: String? = null,
+        @JsonProperty("data") val data: TradData? = null,
+    )
+
+    data class TradData(@JsonProperty("title") val title: String? = null)
 
     data class Genero(@JsonProperty("name") val name: String? = null)
     data class Creditos(@JsonProperty("cast") val cast: List<Actor>? = null)
