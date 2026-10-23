@@ -15,7 +15,8 @@ buildscript {
         classpath("com.android.tools.build:gradle:8.7.3")
         // Cloudstream gradle plugin which makes everything work and builds plugins
         classpath("com.github.recloudstream:gradle:-SNAPSHOT")
-        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:2.1.0")
+        // Costa Stream: actualizado de 2.1.0 a 2.3.0 para leer la librería de CloudStream (Kotlin 2.4)
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:2.3.0")
     }
 }
 
@@ -50,14 +51,15 @@ subprojects {
             targetSdk = 35
         }
 
+        // Costa Stream: Java 11 (antes 1.8)
         compileOptions {
-            sourceCompatibility = JavaVersion.VERSION_1_8
-            targetCompatibility = JavaVersion.VERSION_1_8
+            sourceCompatibility = JavaVersion.VERSION_11
+            targetCompatibility = JavaVersion.VERSION_11
         }
 
         tasks.withType<KotlinJvmCompile> {
             compilerOptions {
-                jvmTarget.set(JvmTarget.JVM_1_8) // Required
+                jvmTarget.set(JvmTarget.JVM_11) // Costa Stream: antes JVM_1_8
                 freeCompilerArgs.addAll(
                     "-Xno-call-assertions",
                     "-Xno-param-assertions",
@@ -83,6 +85,8 @@ subprojects {
         // IMPORTANT: Do not bump Jackson above 2.13.1, as newer versions will
         // break compatibility on older Android devices.
         implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.13.1") // JSON Parser
+        // Costa Stream: corrutinas (para buscar en varios proveedores a la vez)
+        implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
     }
 }
 
