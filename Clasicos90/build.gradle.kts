@@ -1,5 +1,5 @@
 // Versión del plugin: subila (2, 3, 4...) cada vez que cambies algo
-version = 4
+version = 5
 
 cloudstream {
     description = "Clásicos de los 90 en español latino. Busca en tus proveedores instalados."

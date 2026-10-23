@@ -40,7 +40,7 @@ class Clasicos80Provider : MainAPI() {
         private val IDIOMAS = setOf("es", "mx", "es-mx", "es-419", "es-ar")
 
         // Plan B: si ningún proveedor en español la tiene, se busca en estos (otros idiomas)
-        private val PLAN_B = listOf("yts", "streamplay", "internet archive", "internetarchive")
+        private val PLAN_B = listOf("streamplay", "cinestream", "yts", "internet archive", "internetarchive")
 
         // Tiempo máximo de espera por proveedor (milisegundos)
         private const val TIMEOUT_MS = 30_000L
