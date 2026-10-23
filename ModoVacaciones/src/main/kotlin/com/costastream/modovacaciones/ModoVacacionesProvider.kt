@@ -12,6 +12,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withTimeoutOrNull
 import java.net.URLEncoder
 import java.text.Normalizer
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.abs
 
 class ModoVacacionesProvider : MainAPI() {
@@ -43,6 +44,9 @@ class ModoVacacionesProvider : MainAPI() {
 
         // Tiempo máximo de espera por proveedor (milisegundos)
         private const val TIMEOUT_MS = 30_000L
+
+        // El plan B (StreamPlay junta muchos servidores) necesita más tiempo
+        private const val TIMEOUT_PLAN_B_MS = 90_000L
 
         // Títulos alternativos: países preferidos (en orden) y cantidad máxima de títulos a probar
         private val PAISES = listOf("MX", "AR", "CO", "CL", "PE", "VE", "UY", "ES", "US")
@@ -137,7 +141,16 @@ class ModoVacacionesProvider : MainAPI() {
                     api.supportedTypes.contains(TvType.Movie)
         }
 
-        if (buscarEnTodos(proveedores, titulos, buscados, datos.anio, isCasting, subtitleCallback, callback)) return true
+        // Contamos los enlaces que llegan de verdad: algunos proveedores dicen "encontré"
+        // aunque no entreguen ningún enlace
+        val enlaces = AtomicInteger(0)
+        val contar: (ExtractorLink) -> Unit = { link ->
+            enlaces.incrementAndGet()
+            callback(link)
+        }
+
+        buscarEnTodos(proveedores, titulos, buscados, datos.anio, isCasting, subtitleCallback, contar, TIMEOUT_MS)
+        if (enlaces.get() > 0) return true
 
         // Plan B: nadie la tiene en español -> probar fuentes en otros idiomas, primero con el título original
         val planB = APIHolder.apis.toList().filter { api ->
@@ -146,7 +159,8 @@ class ModoVacacionesProvider : MainAPI() {
                     PLAN_B.any { api.name.lowercase().contains(it) }
         }
         val titulosB = (listOfNotNull(datos.original) + titulos).distinct()
-        return buscarEnTodos(planB, titulosB, buscados, datos.anio, isCasting, subtitleCallback, callback)
+        buscarEnTodos(planB, titulosB, buscados, datos.anio, isCasting, subtitleCallback, contar, TIMEOUT_PLAN_B_MS)
+        return enlaces.get() > 0
     }
 
     private suspend fun buscarEnTodos(
@@ -156,13 +170,14 @@ class ModoVacacionesProvider : MainAPI() {
         anio: Int?,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit
+        callback: (ExtractorLink) -> Unit,
+        timeout: Long
     ): Boolean {
         if (proveedores.isEmpty()) return false
         val resultados = coroutineScope {
             proveedores.map { api ->
                 async {
-                    withTimeoutOrNull(TIMEOUT_MS) {
+                    withTimeoutOrNull(timeout) {
                         try {
                             buscarEn(api, titulos, buscados, anio, isCasting, subtitleCallback, callback)
                         } catch (e: Throwable) {
