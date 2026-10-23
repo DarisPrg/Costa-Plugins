@@ -38,6 +38,9 @@ class ModoVacacionesProvider : MainAPI() {
         // Idiomas de los proveedores donde se busca (español / latino)
         private val IDIOMAS = setOf("es", "mx", "es-mx", "es-419", "es-ar")
 
+        // Plan B: si ningún proveedor en español la tiene, se busca en estos (otros idiomas)
+        private val PLAN_B = listOf("yts", "streamplay", "internet archive", "internetarchive")
+
         // Tiempo máximo de espera por proveedor (milisegundos)
         private const val TIMEOUT_MS = 30_000L
 
@@ -134,12 +137,34 @@ class ModoVacacionesProvider : MainAPI() {
                     api.supportedTypes.contains(TvType.Movie)
         }
 
+        if (buscarEnTodos(proveedores, titulos, buscados, datos.anio, isCasting, subtitleCallback, callback)) return true
+
+        // Plan B: nadie la tiene en español -> probar fuentes en otros idiomas, primero con el título original
+        val planB = APIHolder.apis.toList().filter { api ->
+            api.mainUrl != mainUrl &&
+                    api.supportedTypes.contains(TvType.Movie) &&
+                    PLAN_B.any { api.name.lowercase().contains(it) }
+        }
+        val titulosB = (listOfNotNull(datos.original) + titulos).distinct()
+        return buscarEnTodos(planB, titulosB, buscados, datos.anio, isCasting, subtitleCallback, callback)
+    }
+
+    private suspend fun buscarEnTodos(
+        proveedores: List<MainAPI>,
+        titulos: List<String>,
+        buscados: Set<String>,
+        anio: Int?,
+        isCasting: Boolean,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ): Boolean {
+        if (proveedores.isEmpty()) return false
         val resultados = coroutineScope {
             proveedores.map { api ->
                 async {
                     withTimeoutOrNull(TIMEOUT_MS) {
                         try {
-                            buscarEn(api, titulos, buscados, datos.anio, isCasting, subtitleCallback, callback)
+                            buscarEn(api, titulos, buscados, anio, isCasting, subtitleCallback, callback)
                         } catch (e: Throwable) {
                             false
                         }

@@ -1,5 +1,5 @@
 // Versión del plugin: subila (2, 3, 4...) cada vez que cambies algo
-version = 2
+version = 3
 
 cloudstream {
     description = "Todo el cine en un solo lugar: estrenos, géneros, infantiles y clásicos. Busca en tus proveedores instalados."
